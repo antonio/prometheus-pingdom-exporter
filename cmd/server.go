@@ -72,7 +72,7 @@ func checkRequiredFlags() error {
 	requiredFlags := map[string]string{"user": user, "password": password, "api-key": apiKey}
 	for flag, value := range requiredFlags {
 		if value == "" {
-			errorList = append(errorList, fmt.Sprintf("%s not set, and no default value provided via an environment variable\n", flag))
+			errorList = append(errorList, fmt.Sprintf("%s not set, and no default value provided via an environment variable", flag))
 		}
 	}
 	if len(errorList) > 0 {
