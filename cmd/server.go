@@ -107,6 +107,7 @@ func serverRun(cmd *cobra.Command, args []string) {
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 
 	go func() {
