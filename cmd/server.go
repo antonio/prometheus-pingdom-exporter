@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -19,13 +20,17 @@ import (
 
 var (
 	serverCmd = &cobra.Command{
-		Use:   "server [username] [password] [api-key]",
+		Use:   "server",
 		Short: "Start the HTTP server",
 		Run:   serverRun,
 	}
 
-	waitSeconds int
-	port        int
+	waitSeconds  int
+	port         int
+	username     string
+	password     string
+	apiKey       string
+	accountEmail string
 
 	pingdomUp = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "pingdom_up",
@@ -46,8 +51,12 @@ var (
 func init() {
 	RootCmd.AddCommand(serverCmd)
 
-	serverCmd.Flags().IntVar(&waitSeconds, "wait", 10, "time (in seconds) between accessing the Pingdom  API")
+	serverCmd.Flags().IntVar(&waitSeconds, "wait", 10, "time (in seconds) between accessing the Pingdom API")
 	serverCmd.Flags().IntVar(&port, "port", 8000, "port to listen on")
+	serverCmd.Flags().StringVar(&username, "username", os.Getenv("PROMETHEUS_PINGDOM_EXPORTER_USERNAME"), "Pingdom username. Can be set via the PROMETHEUS_PINGDOM_EXPORTER_USERNAME environment variable")
+	serverCmd.Flags().StringVar(&password, "password", os.Getenv("PROMETHEUS_PINGDOM_EXPORTER_PASSWORD"), "Pingdom password. Can be set via the PROMETHEUS_PINGDOM_EXPORTER_PASSWORD environment variable")
+	serverCmd.Flags().StringVar(&apiKey, "api-key", os.Getenv("PROMETHEUS_PINGDOM_EXPORTER_API_KEY"), "Pingdom API key. Can be set via the PROMETHEUS_PINGDOM_EXPORTER_API_KEY environment variable")
+	serverCmd.Flags().StringVar(&accountEmail, "account-email", os.Getenv("PROMETHEUS_PINGDOM_EXPORTER_ACCOUNT_EMAIL"), "Pingdom account email. Can be set via the PROMETHEUS_PINGDOM_EXPORTER_ACCOUNT_EMAIL environment variable")
 
 	prometheus.MustRegister(pingdomUp)
 	prometheus.MustRegister(pingdomCheckStatus)
@@ -58,26 +67,42 @@ func sleep() {
 	time.Sleep(time.Second * time.Duration(waitSeconds))
 }
 
+func checkRequiredFlags() error {
+	errorList := []string{}
+	requiredFlags := map[string]string{"username": username, "password": password, "api-key": apiKey}
+	for flag, value := range requiredFlags {
+		if value == "" {
+			errorList = append(errorList, fmt.Sprintf("%s not set, and no default value provided via an environment variable\n", flag))
+		}
+	}
+	if len(errorList) > 0 {
+		return errors.New(strings.Join(errorList, "\n"))
+	} else {
+		return nil
+	}
+}
+
 func serverRun(cmd *cobra.Command, args []string) {
 	var client *pingdom.Client
 	flag.Parse()
 
-	if len(cmd.Flags().Args()) == 3 {
-		client = pingdom.NewClient(
-			flag.Arg(1),
-			flag.Arg(2),
-			flag.Arg(3),
-		)
-	} else if len(cmd.Flags().Args()) == 4 {
-		client = pingdom.NewMultiUserClient(
-			flag.Arg(1),
-			flag.Arg(2),
-			flag.Arg(3),
-			flag.Arg(4),
-		)
-	} else {
+	err := checkRequiredFlags()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		cmd.Help()
 		os.Exit(1)
+	}
+
+	config := pingdom.ClientConfig{}
+
+	if accountEmail != "" {
+		config.AccountEmail = accountEmail
+	}
+
+	client, err = pingdom.NewClientWithConfig(config)
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 	}
 
 	go func() {
