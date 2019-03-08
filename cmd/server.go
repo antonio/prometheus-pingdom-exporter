@@ -27,7 +27,7 @@ var (
 
 	waitSeconds  int
 	port         int
-	username     string
+	user         string
 	password     string
 	apiKey       string
 	accountEmail string
@@ -53,7 +53,7 @@ func init() {
 
 	serverCmd.Flags().IntVar(&waitSeconds, "wait", 10, "time (in seconds) between accessing the Pingdom API")
 	serverCmd.Flags().IntVar(&port, "port", 8000, "port to listen on")
-	serverCmd.Flags().StringVar(&username, "username", os.Getenv("PROMETHEUS_PINGDOM_EXPORTER_USERNAME"), "Pingdom username. Can be set via the PROMETHEUS_PINGDOM_EXPORTER_USERNAME environment variable")
+	serverCmd.Flags().StringVar(&user, "user", os.Getenv("PROMETHEUS_PINGDOM_EXPORTER_USER"), "Pingdom user. Can be set via the PROMETHEUS_PINGDOM_EXPORTER_USER environment variable")
 	serverCmd.Flags().StringVar(&password, "password", os.Getenv("PROMETHEUS_PINGDOM_EXPORTER_PASSWORD"), "Pingdom password. Can be set via the PROMETHEUS_PINGDOM_EXPORTER_PASSWORD environment variable")
 	serverCmd.Flags().StringVar(&apiKey, "api-key", os.Getenv("PROMETHEUS_PINGDOM_EXPORTER_API_KEY"), "Pingdom API key. Can be set via the PROMETHEUS_PINGDOM_EXPORTER_API_KEY environment variable")
 	serverCmd.Flags().StringVar(&accountEmail, "account-email", os.Getenv("PROMETHEUS_PINGDOM_EXPORTER_ACCOUNT_EMAIL"), "Pingdom account email. Can be set via the PROMETHEUS_PINGDOM_EXPORTER_ACCOUNT_EMAIL environment variable")
@@ -69,7 +69,7 @@ func sleep() {
 
 func checkRequiredFlags() error {
 	errorList := []string{}
-	requiredFlags := map[string]string{"username": username, "password": password, "api-key": apiKey}
+	requiredFlags := map[string]string{"user": user, "password": password, "api-key": apiKey}
 	for flag, value := range requiredFlags {
 		if value == "" {
 			errorList = append(errorList, fmt.Sprintf("%s not set, and no default value provided via an environment variable\n", flag))
@@ -93,7 +93,11 @@ func serverRun(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	config := pingdom.ClientConfig{}
+	config := pingdom.ClientConfig{
+		User:     user,
+		Password: password,
+		APIKey:   apiKey,
+	}
 
 	if accountEmail != "" {
 		config.AccountEmail = accountEmail
